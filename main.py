@@ -145,7 +145,7 @@ def dir_sobel_thresh(gray, kernel=3, thresh=(0, np.pi/2)):
     sobel_y = cv2.Sobel(gray, cv2.CV_64F, 0, 1, ksize=kernel)
     sobel_x_abs = np.absolute(sobel_x)
     sobel_y_abs = np.absolute(sobel_y)
-    grad = np.arctan2(sobel_y_abs, sobel_x_abs)
+    grad = np.arctan2(sobel_x_abs, sobel_y_abs)
     binary = np.zeros_like(grad, dtype=np.uint8)
     binary[(grad >= thresh[0]) & (grad <= thresh[1])] = 1
     return binary
@@ -162,13 +162,14 @@ def hls_s_thresh(img, thresh=(0, 255)):
 def gradient_threshold(img):
     smooth = gaussian_blur(img, kernel=9)
     gray = cv2.cvtColor(smooth, cv2.COLOR_RGB2GRAY)
-    abs_bin = abs_sobel_thresh(gray, dx=1, dy=0, kernel=3, thresh=(20, 100))
-    # mag_bin = mag_sobel_thresh(gray, sobel_kernel=7, thresh=(5, 40))
+    abs_bin = abs_sobel_thresh(gray, dx=1, dy=0, kernel=7, thresh=(30, 70))
+    mag_bin = mag_sobel_thresh(gray, kernel=9, thresh=(25, 100))
+    dir_bin = dir_sobel_thresh(gray, kernel=9, thresh=(np.pi/2*0.8, np.pi/2))
     hls_bin = hls_s_thresh(img, thresh=(170, 255))
     # Combine the two binary thresholds
     binary = np.zeros_like(abs_bin, dtype=np.uint8)
     binary[(abs_bin == 1) | (hls_bin == 1)] = 1
-    return binary, abs_bin, hls_bin
+    return binary, abs_bin, hls_bin, mag_bin, dir_bin
 
 
 def setup(config_file='config.json'):
@@ -219,6 +220,18 @@ def draw_lane(img, pts):
     pts = pts.astype(np.int32)
     cv2.polylines(img, [pts], True, (0, 0, 255), 3)
 
+
+def test_threshold(img, abs_bin, hls_bin, mag_bin, dir_bin):
+    test = np.zeros_like(mag_bin)
+    test[(mag_bin == 1) & (dir_bin == 1)] = 1
+    print(mag_bin.dtype)
+    print(dir_bin.dtype)
+    stacks = np.dstack((np.zeros_like(test), test*255, hls_bin*255))
+    # stacks = np.dstack((mag_bin*0, dir_bin*0, test*255))
+    f, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 7))
+    ax1.imshow(img)
+    ax2.imshow(stacks)
+    plt.show()
 
 def test_perspective(img, camera):
     with open('config.json') as f:
