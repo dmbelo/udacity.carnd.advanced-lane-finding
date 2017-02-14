@@ -9,7 +9,7 @@ class Camera():
     def __init__(self, img_size):
         self.mtx = []
         self.dtx = []
-        self.img_size = img_size
+        self.img_size = tuple(img_size)
         self.M_plan = []  # perspective transform
         self.M_front = []  # inverse perspective transform
 
@@ -42,8 +42,8 @@ class Camera():
 
     def perspective_setup(self, src, dst):
         # Argumnets: source and destination points
-        self.M = cv2.getPerspectiveTransform(src, dst)
-        self.iM = cv2.getPerspectiveTransform(dst, src)
+        self.M_plan = cv2.getPerspectiveTransform(src, dst)
+        self.M_front = cv2.getPerspectiveTransform(dst, src)
 
     def undistort(self, img):
         """Undistort image"""
@@ -51,11 +51,11 @@ class Camera():
 
     def plan_view(self, img):
         flag = cv2.INTER_LINEAR
-        return cv2.warpPerspective(img, self.M_plan, self.size, flags=flag)
+        return cv2.warpPerspective(img, self.M_plan, self.img_size, flags=flag)
 
     def front_view(self, img):
         flag = cv2.INTER_LINEAR
-        return cv2.warpPerspective(img, self.M_front, self.size, flags=flag)
+        return cv2.warpPerspective(img, self.M_front, self.img_size, flags=flag)
 
 
 class Line():
@@ -94,11 +94,11 @@ class Lane():
     def targeted_search(self, binary):
         raise NotImplementedError
 
-    def line_search(self, binary):
+    def search(self, binary):
         if (self.left_line.detected | self.right_line.detected):
             self.targeted_search(binary)
         else:
-            self.lane.blind_search(binary)
+            self.blind_search(binary)
 
     def sanity_check(self):
         # Checking that they have similar curvature
@@ -178,13 +178,13 @@ def setup(config_file='config.json'):
     cal_glob = config['Calibration image search pattern']
     nx = config['Number of corners - X']
     ny = config['Number of corners - Y']
-    src = np.array(config['Source Perspective Points'], dtype=np.float32)
-    dst = np.array(config['Source Perspective Points'], dtype=np.float32)
+    src = np.array(config['Source perspective points'], dtype=np.float32)
+    dst = np.array(config['Destination perspective points'], dtype=np.float32)
     lane_width = config['Lane width']
 
     camera = Camera(img_size)
     cal_images = glob.glob(cal_glob)
-    camera.calibrate(cal_images, nx=nx, ny=ny)
+    camera.calibrate(cal_images, nx=nx, ny=ny, save=True)
     camera.perspective_setup(src, dst)
 
     lane = Lane(Line(), Line(), lane_width)
@@ -196,7 +196,7 @@ def pipeline(img, camera, lane):
     undist = camera.undistort(img)
     # plan = camera.plan_view(undist)
     binary, abs_bin, hsl_bin = gradient_threshold(undist)
-    # lane.search(binary)
+    lane.search(binary)
     # Smoothing ... last 5 frames...
     # lane.sanity_check()
     # x = lane.center_offset(img)
