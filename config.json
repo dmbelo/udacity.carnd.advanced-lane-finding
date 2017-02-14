@@ -1,0 +1,9 @@
+{
+  "Image resolution": [1280, 720],
+  "Calibration image search pattern": "../carnd.advanced-lane-finding-data/camera_cal/calibration*",
+  "Number of corners - X": 9,
+  "Number of corners - Y": 6,
+  "Source perspective points": [[560, 474], [727, 474], [1090, 710], [225, 710]],
+  "Destination perspective points": [[225, 0], [1090, 0], [1090, 710], [225, 710]],
+  "Lane width": 10
+}

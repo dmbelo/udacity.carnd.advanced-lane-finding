@@ -184,7 +184,7 @@ def setup(config_file='config.json'):
 
     camera = Camera(img_size)
     cal_images = glob.glob(cal_glob)
-    camera.calibrate(cal_images, nx=nx, ny=ny, save=True)
+    camera.calibrate(cal_images, nx=nx, ny=ny, save=False)
     camera.perspective_setup(src, dst)
 
     lane = Lane(Line(), Line(), lane_width)
@@ -214,6 +214,24 @@ def main():
 
     pipeline(img, camera, lane)
 
+
+def draw_lane(img, pts):
+    pts = pts.astype(np.int32)
+    cv2.polylines(img, [pts], True, (0, 0, 255), 3)
+
+
+def test_perspective(img, camera):
+    with open('config.json') as f:
+        config = json.load(f)
+    undist = camera.undistort(img)
+    plan = camera.plan_view(undist)
+    draw_lane(undist, np.array(config['Source perspective points']))
+    draw_lane(undist, np.array(config['Destination perspective points']))
+    plt.subplot(211)
+    plt.imshow(undist)
+    plt.subplot(212)
+    plt.imshow(plan)
+    plt.show()
 
 if __name__ == '__main__':
     main()
