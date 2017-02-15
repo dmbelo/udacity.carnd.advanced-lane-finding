@@ -200,15 +200,15 @@ class Lane():
         self.right_line.x = right_fitx
         self.right_line.y = ploty
 
-        out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
-        out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
-        plt.figure()
-        plt.imshow(out_img)
-        plt.plot(left_fitx, ploty, color='yellow')
-        plt.plot(right_fitx, ploty, color='yellow')
-        plt.xlim(0, 1280)
-        plt.ylim(720, 0)
-        plt.show()
+        # out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
+        # out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
+        # plt.figure()
+        # plt.imshow(out_img)
+        # plt.plot(left_fitx, ploty, color='yellow')
+        # plt.plot(right_fitx, ploty, color='yellow')
+        # plt.xlim(0, 1280)
+        # plt.ylim(720, 0)
+        # plt.show()
 
         # Record findings
         self.left_line.detected = True
@@ -261,31 +261,31 @@ class Lane():
         # And you're done! But let's visualize the result here as well
         # Create an image to draw on and an image to show the selection window
         out_img = np.dstack((binary, binary, binary)) * 255
-        window_img = np.zeros_like(out_img)
+        # window_img = np.zeros_like(out_img)
         # Color in left and right line pixels
         out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
         out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
 
         # Generate a polygon to illustrate the search window area
         # And recast the x and y points into usable format for cv2.fillPoly()
-        left_line_window1 = np.array([np.transpose(np.vstack([left_fitx-margin, ploty]))])
-        left_line_window2 = np.array([np.flipud(np.transpose(np.vstack([left_fitx + margin, ploty])))])
-        left_line_pts = np.hstack((left_line_window1, left_line_window2))
-        right_line_window1 = np.array([np.transpose(np.vstack([right_fitx-margin, ploty]))])
-        right_line_window2 = np.array([np.flipud(np.transpose(np.vstack([right_fitx + margin, ploty])))])
-        right_line_pts = np.hstack((right_line_window1, right_line_window2))
+        # left_line_window1 = np.array([np.transpose(np.vstack([left_fitx-margin, ploty]))])
+        # left_line_window2 = np.array([np.flipud(np.transpose(np.vstack([left_fitx + margin, ploty])))])
+        # left_line_pts = np.hstack((left_line_window1, left_line_window2))
+        # right_line_window1 = np.array([np.transpose(np.vstack([right_fitx-margin, ploty]))])
+        # right_line_window2 = np.array([np.flipud(np.transpose(np.vstack([right_fitx + margin, ploty])))])
+        # right_line_pts = np.hstack((right_line_window1, right_line_window2))
 
         # Draw the lane onto the warped blank image
-        cv2.fillPoly(window_img, np.int_([left_line_pts]), (0, 255, 0))
-        cv2.fillPoly(window_img, np.int_([right_line_pts]), (0, 255, 0))
-        result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
-        plt.figure()
-        plt.imshow(result)
-        plt.plot(left_fitx, ploty, color='yellow')
-        plt.plot(right_fitx, ploty, color='yellow')
-        plt.xlim(0, 1280)
-        plt.ylim(720, 0)
-        plt.show()
+        # cv2.fillPoly(window_img, np.int_([left_line_pts]), (0, 255, 0))
+        # cv2.fillPoly(window_img, np.int_([right_line_pts]), (0, 255, 0))
+        # result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
+        # plt.figure()
+        # plt.imshow(result)
+        # plt.plot(left_fitx, ploty, color='yellow')
+        # plt.plot(right_fitx, ploty, color='yellow')
+        # plt.xlim(0, 1280)
+        # plt.ylim(720, 0)
+        # plt.show()
 
     def search(self, binary):
         if (self.left_line.detected | self.right_line.detected):
@@ -406,7 +406,7 @@ def setup(config_file='config.json'):
     return camera, lane
 
 
-def pipeline(img, camera, lane):
+def process_frame(img, camera, lane):
     undist = camera.undistort(img)
     plan = camera.plan_view(undist)
     binary, info = gradient_threshold(plan)
@@ -415,20 +415,35 @@ def pipeline(img, camera, lane):
     # lane.sanity_check()
     # x = lane.center_offset(img)
     overlay = lane.overlay(undist, camera)
-    plt.figure()
-    plt.imshow(overlay)
-    plt.show()
+    return overlay
+    # plt.figure()
+    # plt.imshow(overlay)
+    # plt.show()
 
 
 def main():
     camera, lane = setup()
-    img = cv2.cvtColor(cv2.imread('test6.jpg'), cv2.COLOR_BGR2RGB)
-    pipeline(img, camera, lane)
+    # img = cv2.cvtColor(cv2.imread('test6.jpg'), cv2.COLOR_BGR2RGB)
+    movie = True
+    file = 'project_video.mp4'
 
-
-def draw_lane(img, pts):
-    pts = pts.astype(np.int32)
-    cv2.polylines(img, [pts], True, (0, 0, 255), 3)
+    if movie:
+        cap = cv2.VideoCapture(file)
+        while(cap.isOpened()):
+            ret, frame = cap.read()
+            if ret:
+                img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                overlay = process_frame(img, camera, lane)
+                cv2.imshow('frame', overlay)
+                if cv2.waitKey(1) & 0xFF == ord('q'):
+                    break
+            else:
+                break
+        cap.release()
+        cv2.destroyAllWindows()
+    else:
+        img = cv2.cvtColor(cv2.imread(file), cv2.COLOR_BGR2RGB)
+        process_frame(img, camera, lane)
 
 
 def test_threshold(img, abs_bin, hls_bin, mag_bin, dir_bin):
