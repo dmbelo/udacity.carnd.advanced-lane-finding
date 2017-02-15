@@ -3,7 +3,6 @@ import cv2
 import json
 import glob
 import matplotlib.pyplot as plt
-import ipdb
 
 
 class Camera():
@@ -63,8 +62,9 @@ class Line():
     def __init__(self):
         # was the line detected in the last iteration?
         self.detected = False
-        # x values of the last n fits of the line
-        self.recent_xfitted = []
+        # x values of the last 5 fits of the line
+        self.recent_x = [[], [], [], [], []]
+        self.recent_y = [[], [], [], [], []]
         # average x values of the fitted line over the last n iterations
         self.bestx = None
         # polynomial coefficients averaged over the last n iterations
@@ -81,6 +81,24 @@ class Line():
         self.allx = None
         # y values for detected line pixels
         self.ally = None
+
+    def update_xy(self, x, y):
+        self.recent_x[:-1] = self.recent_x[1:]
+        self.recent_x[-1] = x
+        self.recent_y[:-1] = self.recent_y[1:]
+        self.recent_y[-1] = y
+
+    def fit(self):
+        n = 5e3
+        # List of lists into one numpy array
+        x = np.array([item for sublist in self.recent_x for item in sublist])
+        y = np.array([item for sublist in self.recent_y for item in sublist])
+        print(x.shape[0])
+        if x.shape[0] > n:
+            return np.polyfit(y, x, 2)
+        else:
+            p = np.polyfit(y, x, 1)
+            return np.concatenate([[0], p])
 
 
 class Lane():
@@ -162,10 +180,13 @@ class Lane():
         rightx = nonzerox[right_lane_inds]
         righty = nonzeroy[right_lane_inds]
 
-        # Fit a second order polynomial to each
-        left_fit = np.polyfit(lefty, leftx, 2)
-        right_fit = np.polyfit(righty, rightx, 2)
-        # If there are more points on one lane it should be weighted accordingly
+        # Update the line objects
+        self.left_line.update_xy(leftx, lefty)
+        self.right_line.update_xy(rightx, righty)
+
+        # Fit a polynomial to each
+        left_fit = self.left_line.fit()
+        right_fit = self.right_line.fit()
 
         # PLOTTING
         # Generate x and y values for plotting
@@ -186,8 +207,11 @@ class Lane():
         # Record findings
         self.left_line.detected = True
         self.left_line.current_fit = left_fit
+        self.left_line.best_fit = left_fit
+
         self.right_line.detected = True
         self.right_line.current_fit = right_fit
+        self.right_line.best_fit = right_fit
 
     def targeted_search(self, binary):
         # Skip the sliding windows step once you know where the lines are
@@ -195,8 +219,8 @@ class Lane():
         # of video you don't need to do a blind search again, but instead you
         # can just search in a margin around the previous line position
         # like this:
-        left_fit = self.left_line.current_fit
-        right_fit = self.right_line.current_fit
+        left_fit = self.left_line.best_fit
+        right_fit = self.right_line.best_fit
         # Assume you now have a new warped binary image
         # from the next frame of video (also called "binary_warped")
         # It's now much easier to find line pixels!
@@ -212,9 +236,15 @@ class Lane():
         lefty = nonzeroy[left_lane_inds]
         rightx = nonzerox[right_lane_inds]
         righty = nonzeroy[right_lane_inds]
-        # Fit a second order polynomial to each
-        left_fit = np.polyfit(lefty, leftx, 2)
-        right_fit = np.polyfit(righty, rightx, 2)
+
+        # Update the line objects
+        self.left_line.update_xy(leftx, lefty)
+        self.right_line.update_xy(rightx, righty)
+
+        # Fit a polynomial to each
+        left_fit = self.left_line.fit()
+        right_fit = self.right_line.fit()
+
         # Generate x and y values for plotting
         ploty = np.linspace(0, binary.shape[0]-1, binary.shape[0])
         left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
