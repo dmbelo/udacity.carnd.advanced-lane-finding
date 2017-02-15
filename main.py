@@ -401,7 +401,7 @@ def hls_s_thresh(img, thresh=(0, 255)):
     return binary
 
 
-def gradient_threshold(img):
+def lane_pixels(img):
     smooth = gaussian_blur(img, kernel=9)
     gray = cv2.cvtColor(smooth, cv2.COLOR_RGB2GRAY)
     # abs_bin = abs_sobel_thresh(gray, dx=1, dy=0, kernel=7, thresh=(30, 70))
@@ -438,7 +438,7 @@ def setup(config_file='config.json'):
 def process_frame(img, camera, lane):
     undist = camera.undistort(img)
     plan = camera.plan_view(undist)
-    binary, info = gradient_threshold(plan)
+    binary, info = lane_pixels(plan)
     lane.search(binary)
     camera_center = camera.img_size[0]//2
     lane.lane_kinematics(x0=camera_center)
