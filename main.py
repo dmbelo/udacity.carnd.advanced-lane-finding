@@ -73,6 +73,7 @@ class Line():
         self.current_fit = [np.array([False])]
         self.x = []
         self.y = []
+        self.c = 0  # curvature
         # radius of curvature of the line in some units
         # self.radius_of_curvature = None
         # distance in meters of vehicle center from the line
@@ -104,10 +105,14 @@ class Line():
 
 
 class Lane():
-    def __init__(self, width):
+    def __init__(self):
         self.left_line = Line()
         self.right_line = Line()
-        self.width = width
+        self.center_offset = 0
+        self
+        # self.width = width
+        self.xm_per_pix = 3.7/700  # meters per pixel in x dimension
+        self.ym_per_pix = 30/720  # meters per pixel in y dimension
 
     def blind_search(self, binary):
         # Take a histogram of the bottom half of the image
@@ -300,9 +305,6 @@ class Lane():
         # Checking that they are roughly parallel
         raise NotImplementedError
 
-    def center_offset(self, img):
-        raise NotImplemented
-
     def overlay(self, img, camera):
         # Create an image to draw the lines on
         # warp_zero = np.zeros_like(warped).astype(np.uint8)
@@ -325,6 +327,33 @@ class Lane():
         newwarp = cv2.warpPerspective(color_warp, camera.M_front, (img.shape[1], img.shape[0]))
         # Combine the result with the original image
         return cv2.addWeighted(img, 1, newwarp, 0.3, 0)
+
+    def lane_kinematics(self, x0):
+        y_max = np.max(self.left_line.y)
+        # Fit new polynomials to x,y in world space
+        left_fit_cr = np.polyfit(self.left_line.y * self.ym_per_pix,
+                                 self.left_line.x * self.xm_per_pix, 2)
+        right_fit_cr = np.polyfit(self.right_line.y * self.ym_per_pix,
+                                  self.right_line.x * self.xm_per_pix, 2)
+        # Calculate the new radii of curvature
+        left_curverad = ((1 + (2*left_fit_cr[0] * y_max * self.ym_per_pix +
+                         left_fit_cr[1]) ** 2) ** 1.5) / np.absolute(2 * left_fit_cr[0])
+        right_curverad = ((1 + (2*right_fit_cr[0] * y_max * self.ym_per_pix +
+                          right_fit_cr[1])**2)**1.5) / np.absolute(2 * right_fit_cr[0])
+        # Now our radius of curvature is in meters
+        self.left_line.c = left_curverad
+        self.right_line.c = right_curverad
+        # Example values: 632.1 m    626.2 me
+        left_delta = left_fit_cr[0] * (y_max * self.ym_per_pix) ** 2 + \
+                     left_fit_cr[1] * (y_max * self.ym_per_pix) + \
+                     left_fit_cr[2]
+
+        right_delta = right_fit_cr[0] * (y_max * self.ym_per_pix) ** 2 + \
+                      right_fit_cr[1] * (y_max * self.ym_per_pix) + \
+                      right_fit_cr[2]
+
+        lane_center = (right_delta + left_delta)/2
+        self.center_offset = x0 * self.xm_per_pix - lane_center
 
 
 def gaussian_blur(img, kernel):
@@ -375,14 +404,14 @@ def hls_s_thresh(img, thresh=(0, 255)):
 def gradient_threshold(img):
     smooth = gaussian_blur(img, kernel=9)
     gray = cv2.cvtColor(smooth, cv2.COLOR_RGB2GRAY)
-    abs_bin = abs_sobel_thresh(gray, dx=1, dy=0, kernel=7, thresh=(30, 70))
+    # abs_bin = abs_sobel_thresh(gray, dx=1, dy=0, kernel=7, thresh=(30, 70))
     mag_bin = mag_sobel_thresh(gray, kernel=9, thresh=(25, 100))
     dir_bin = dir_sobel_thresh(gray, kernel=9, thresh=(np.pi/2*0.8, np.pi/2))
     hls_bin = hls_s_thresh(img, thresh=(170, 255))
     # Combine the two binary thresholds
-    binary = np.zeros_like(abs_bin, dtype=np.uint8)
+    binary = np.zeros_like(mag_bin, dtype=np.uint8)
     binary[((mag_bin == 1) & (dir_bin == 1)) | (hls_bin == 1)] = 1
-    return binary, (abs_bin, hls_bin, mag_bin, dir_bin)
+    return binary, (hls_bin, mag_bin, dir_bin)
 
 
 def setup(config_file='config.json'):
@@ -394,14 +423,14 @@ def setup(config_file='config.json'):
     ny = config['Number of corners - Y']
     src = np.array(config['Source perspective points'], dtype=np.float32)
     dst = np.array(config['Destination perspective points'], dtype=np.float32)
-    lane_width = config['Lane width']
+    # lane_width = config['Lane width']
 
     camera = Camera(img_size)
     cal_images = glob.glob(cal_glob)
     camera.calibrate(cal_images, nx=nx, ny=ny, save=False)
     camera.perspective_setup(src, dst)
 
-    lane = Lane(lane_width)
+    lane = Lane()
 
     return camera, lane
 
@@ -411,10 +440,19 @@ def process_frame(img, camera, lane):
     plan = camera.plan_view(undist)
     binary, info = gradient_threshold(plan)
     lane.search(binary)
+    camera_center = camera.img_size[0]//2
+    lane.lane_kinematics(x0=camera_center)
+    # print(lane.center_offset)
     # Smoothing ... last 5 frames...
     # lane.sanity_check()
     # x = lane.center_offset(img)
     overlay = lane.overlay(undist, camera)
+    curvature = (lane.left_line.c + lane.right_line.c)/2
+    cv2.putText(overlay, 'Curvature: ' + '{0:.2f}'.format(curvature) + ' m',
+                (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0))
+    cv2.putText(overlay, 'Offset from center: ' +
+                '{0:.2f}'.format(lane.center_offset) + ' m',
+                (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0))
     return overlay
     # plt.figure()
     # plt.imshow(overlay)
@@ -426,24 +464,36 @@ def main():
     # img = cv2.cvtColor(cv2.imread('test6.jpg'), cv2.COLOR_BGR2RGB)
     movie = True
     file = 'project_video.mp4'
+    # file = 'test2.jpg'
 
     if movie:
         cap = cv2.VideoCapture(file)
+        # fourcc = cv2.VideoWriter_fourcc('MJPG')
+        # fourcc = cv2.VideoWriter_fourcc(*'XVID')
+        # fourcc = cv2.cv.CV_FOURCC('m', 'p', '4', 'v') # note the lower cas
+        fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
+        video_writer = cv2.VideoWriter('output.mov', fourcc, 20, (1280, 720))
+        # video_writer = cv2.VideoWriter("output.avi", fourcc, 20, (680, 480))
         while(cap.isOpened()):
             ret, frame = cap.read()
             if ret:
                 img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 overlay = process_frame(img, camera, lane)
-                cv2.imshow('frame', overlay)
+                display = cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR)
+                video_writer.write(display)
+                cv2.imshow('frame', display)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
             else:
                 break
         cap.release()
+        video_writer.release()
         cv2.destroyAllWindows()
     else:
         img = cv2.cvtColor(cv2.imread(file), cv2.COLOR_BGR2RGB)
-        process_frame(img, camera, lane)
+        overlay = process_frame(img, camera, lane)
+        plt.imshow(overlay)
+        plt.show()
 
 
 def test_threshold(img, abs_bin, hls_bin, mag_bin, dir_bin):
