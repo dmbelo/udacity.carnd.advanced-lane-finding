@@ -43,9 +43,7 @@
 |--|--|
 |Provide a link to your final video output. Your pipeline should perform reasonably well on the entire project video (wobbly lines are ok but no catastrophic failures that would cause the car to drive off the road!)|The image processing pipeline that was established to find the lane lines in images successfully processes the video. The output here should be a new video where the lanes are identified in every frame, and outputs are generated regarding the radius of curvature of the lane and vehicle position within the lane. The pipeline should correctly map out curved lines and not fail when shadows or pavement color changes are present. The output video should be linked to in the writeup and/or saved and submitted with the project.|
 
-<a href="http://www.youtube.com/watch?feature=player_embedded&v=05e3YNzs7xE&t=2s
-" target="_blank"><img src="http://img.youtube.com/vi/05e3YNzs7xE&t=2s/0.jpg"
-alt="Advanced Lane Finding" width="240" height="180" border="10" /></a>
+<iframe width="560" height="315" src="https://www.youtube.com/embed/05e3YNzs7xE" frameborder="0" allowfullscreen></iframe>
 
 # Discussion
 |Criteria|Meets Specifications|
