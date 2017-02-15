@@ -86,6 +86,7 @@ class Line():
         # self.ally = None
 
     def update_xy(self, x, y):
+        # Insert new points at the top and remove oldest pts from the bottom
         self.recent_x_pixels[:-1] = self.recent_x_pixels[1:]
         self.recent_x_pixels[-1] = x
         self.recent_y_pixels[:-1] = self.recent_y_pixels[1:]
@@ -96,7 +97,6 @@ class Line():
         # List of lists into one numpy array
         x = np.array([item for sublist in self.recent_x_pixels for item in sublist])
         y = np.array([item for sublist in self.recent_y_pixels for item in sublist])
-        # print(x.shape[0])
         if x.shape[0] > n:
             return np.polyfit(y, x, 2)
         else:
@@ -109,8 +109,6 @@ class Lane():
         self.left_line = Line()
         self.right_line = Line()
         self.center_offset = 0
-        self
-        # self.width = width
         self.xm_per_pix = 3.7/700  # meters per pixel in x dimension
         self.ym_per_pix = 30/720  # meters per pixel in y dimension
 
@@ -195,7 +193,6 @@ class Lane():
         left_fit = self.left_line.fit()
         right_fit = self.right_line.fit()
 
-        # PLOTTING
         # Generate x and y values for plotting
         ploty = np.linspace(0, binary.shape[0]-1, binary.shape[0])
         left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]
@@ -205,12 +202,16 @@ class Lane():
         self.right_line.x = right_fitx
         self.right_line.y = ploty
 
+        # Plotting
         # out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
         # out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
-        # plt.figure()
-        # plt.imshow(out_img)
-        # plt.plot(left_fitx, ploty, color='yellow')
-        # plt.plot(right_fitx, ploty, color='yellow')
+        # f, (ax1) = plt.subplots(1, 1, figsize=(15, 7))
+        # ax1.imshow(out_img)
+        # ax1.plot(left_fitx, ploty, color='yellow')
+        # ax1.plot(right_fitx, ploty, color='yellow')
+        # ax1.xaxis.set_visible(False)
+        # ax1.yaxis.set_visible(False)
+        # ax1.set_title('Blind Lane Search')
         # plt.xlim(0, 1280)
         # plt.ylim(720, 0)
         # plt.show()
@@ -265,11 +266,11 @@ class Lane():
 
         # And you're done! But let's visualize the result here as well
         # Create an image to draw on and an image to show the selection window
-        out_img = np.dstack((binary, binary, binary)) * 255
+        # out_img = np.dstack((binary, binary, binary)) * 255
         # window_img = np.zeros_like(out_img)
         # Color in left and right line pixels
-        out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
-        out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
+        # out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
+        # out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
 
         # Generate a polygon to illustrate the search window area
         # And recast the x and y points into usable format for cv2.fillPoly()
@@ -284,10 +285,13 @@ class Lane():
         # cv2.fillPoly(window_img, np.int_([left_line_pts]), (0, 255, 0))
         # cv2.fillPoly(window_img, np.int_([right_line_pts]), (0, 255, 0))
         # result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
-        # plt.figure()
-        # plt.imshow(result)
-        # plt.plot(left_fitx, ploty, color='yellow')
-        # plt.plot(right_fitx, ploty, color='yellow')
+        # f, (ax1) = plt.subplots(1, 1, figsize=(15, 7))
+        # ax1.imshow(result)
+        # ax1.plot(left_fitx, ploty, color='yellow')
+        # ax1.plot(right_fitx, ploty, color='yellow')
+        # ax1.xaxis.set_visible(False)
+        # ax1.yaxis.set_visible(False)
+        # ax1.set_title('Targeted Lane Search')
         # plt.xlim(0, 1280)
         # plt.ylim(720, 0)
         # plt.show()
@@ -440,12 +444,10 @@ def process_frame(img, camera, lane):
     plan = camera.plan_view(undist)
     binary, info = lane_pixels(plan)
     lane.search(binary)
+    lane.search(binary)
     camera_center = camera.img_size[0]//2
     lane.lane_kinematics(x0=camera_center)
-    # print(lane.center_offset)
-    # Smoothing ... last 5 frames...
     # lane.sanity_check()
-    # x = lane.center_offset(img)
     overlay = lane.overlay(undist, camera)
     curvature = (lane.left_line.c + lane.right_line.c)/2
     cv2.putText(overlay, 'Curvature: ' + '{0:.2f}'.format(curvature) + ' m',
@@ -454,9 +456,6 @@ def process_frame(img, camera, lane):
                 '{0:.2f}'.format(lane.center_offset) + ' m',
                 (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 0))
     return overlay
-    # plt.figure()
-    # plt.imshow(overlay)
-    # plt.show()
 
 
 def main():
@@ -464,16 +463,12 @@ def main():
     # img = cv2.cvtColor(cv2.imread('test6.jpg'), cv2.COLOR_BGR2RGB)
     movie = True
     file = 'project_video.mp4'
-    # file = 'test2.jpg'
+    # file = 'doc/example.jpg'
 
     if movie:
         cap = cv2.VideoCapture(file)
-        # fourcc = cv2.VideoWriter_fourcc('MJPG')
-        # fourcc = cv2.VideoWriter_fourcc(*'XVID')
-        # fourcc = cv2.cv.CV_FOURCC('m', 'p', '4', 'v') # note the lower cas
         fourcc = cv2.VideoWriter_fourcc('m', 'p', '4', 'v')
         video_writer = cv2.VideoWriter('output.mov', fourcc, 20, (1280, 720))
-        # video_writer = cv2.VideoWriter("output.avi", fourcc, 20, (680, 480))
         while(cap.isOpened()):
             ret, frame = cap.read()
             if ret:
@@ -492,35 +487,56 @@ def main():
     else:
         img = cv2.cvtColor(cv2.imread(file), cv2.COLOR_BGR2RGB)
         overlay = process_frame(img, camera, lane)
-        plt.imshow(overlay)
+        f, (ax1) = plt.subplots(1, 1, figsize=(15, 7))
+        ax1.imshow(overlay)
+        ax1.xaxis.set_visible(False)
+        ax1.yaxis.set_visible(False)
+        ax1.set_title('Overlaid Green Carpet')
         plt.show()
 
 
-def test_threshold(img, abs_bin, hls_bin, mag_bin, dir_bin):
-    test = np.zeros_like(mag_bin)
-    test[(mag_bin == 1) & (dir_bin == 1)] = 1
-    print(mag_bin.dtype)
-    print(dir_bin.dtype)
-    stacks = np.dstack((np.zeros_like(test), test*255, hls_bin*255))
-    # stacks = np.dstack((mag_bin*0, dir_bin*0, test*255))
-    f, (ax1, ax2) = plt.subplots(1, 2, figsize=(15, 7))
-    ax1.imshow(img)
-    ax2.imshow(stacks)
-    plt.show()
+# def test_threshold(img):
+#     binary, (hls_bin, mag_bin, dir_bin) = lane_pixels(img)
+#     grad_bin = np.zeros_like(mag_bin)
+#     grad_bin[(mag_bin == 1) & (dir_bin == 1)] = 1
+#     stacks = np.dstack((np.zeros_like(hls_bin), hls_bin*255, grad_bin*255))
+#     # stacks = np.dstack((mag_bin*0, dir_bin*0, test*255))
+#     f, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 7))
+#     ax1.imshow(img)
+#     ax1.xaxis.set_visible(False)
+#     ax1.yaxis.set_visible(False)
+#     ax1.set_title('Undistorted Original')
+#     ax2.imshow(stacks)
+#     ax2.xaxis.set_visible(False)
+#     ax2.yaxis.set_visible(False)
+#     ax2.set_title('Filter Stacks')
+#     ax3.imshow(binary*255, cmap='gray')
+#     ax3.xaxis.set_visible(False)
+#     ax3.yaxis.set_visible(False)
+#     ax3.set_title('Final Binary')
+#     plt.tight_layout()
+#     plt.show()
 
 
-def test_perspective(img, camera):
-    with open('config.json') as f:
-        config = json.load(f)
-    undist = camera.undistort(img)
-    plan = camera.plan_view(undist)
-    draw_lane(undist, np.array(config['Source perspective points']))
-    draw_lane(undist, np.array(config['Destination perspective points']))
-    plt.subplot(211)
-    plt.imshow(undist)
-    plt.subplot(212)
-    plt.imshow(plan)
-    plt.show()
+# def test_perspective(img, camera):
+#     binary, (hls_bin, mag_bin, dir_bin) = lane_pixels(img)
+#     img_plan = camera.plan_view(img)
+#     binary_plan = camera.plan_view(binary)
+#     f, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(15, 7))
+#     ax1.imshow(img)
+#     ax1.xaxis.set_visible(False)
+#     ax1.yaxis.set_visible(False)
+#     ax1.set_title('Undistorted Original')
+#     ax2.imshow(img_plan)
+#     ax2.xaxis.set_visible(False)
+#     ax2.yaxis.set_visible(False)
+#     ax2.set_title('Perspective Transform on Original')
+#     ax3.imshow(binary_plan*255, cmap='gray')
+#     ax3.xaxis.set_visible(False)
+#     ax3.yaxis.set_visible(False)
+#     ax3.set_title('Perspective Transform on Filtering Binary')
+#     plt.tight_layout()
+#     plt.show()
 
 
 if __name__ == '__main__':
