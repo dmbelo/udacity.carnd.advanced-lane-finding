@@ -63,14 +63,16 @@ class Line():
         # was the line detected in the last iteration?
         self.detected = False
         # x values of the last 5 fits of the line
-        self.recent_x = [[], [], [], [], []]
-        self.recent_y = [[], [], [], [], []]
+        self.recent_x_pixels = [[], [], [], [], []]
+        self.recent_y_pixels = [[], [], [], [], []]
         # average x values of the fitted line over the last n iterations
         # self.bestx = None
         # polynomial coefficients averaged over the last n iterations
         # self.best_fit = None
         # polynomial coefficients for the most recent fit
         self.current_fit = [np.array([False])]
+        self.x = []
+        self.y = []
         # radius of curvature of the line in some units
         # self.radius_of_curvature = None
         # distance in meters of vehicle center from the line
@@ -83,16 +85,16 @@ class Line():
         # self.ally = None
 
     def update_xy(self, x, y):
-        self.recent_x[:-1] = self.recent_x[1:]
-        self.recent_x[-1] = x
-        self.recent_y[:-1] = self.recent_y[1:]
-        self.recent_y[-1] = y
+        self.recent_x_pixels[:-1] = self.recent_x_pixels[1:]
+        self.recent_x_pixels[-1] = x
+        self.recent_y_pixels[:-1] = self.recent_y_pixels[1:]
+        self.recent_y_pixels[-1] = y
 
     def fit(self):
         n = 5e3
         # List of lists into one numpy array
-        x = np.array([item for sublist in self.recent_x for item in sublist])
-        y = np.array([item for sublist in self.recent_y for item in sublist])
+        x = np.array([item for sublist in self.recent_x_pixels for item in sublist])
+        y = np.array([item for sublist in self.recent_y_pixels for item in sublist])
         # print(x.shape[0])
         if x.shape[0] > n:
             return np.polyfit(y, x, 2)
@@ -193,6 +195,10 @@ class Lane():
         ploty = np.linspace(0, binary.shape[0]-1, binary.shape[0])
         left_fitx = left_fit[0] * ploty ** 2 + left_fit[1] * ploty + left_fit[2]
         right_fitx = right_fit[0] * ploty ** 2 + right_fit[1] * ploty + right_fit[2]
+        self.left_line.x = left_fitx
+        self.left_line.y = ploty
+        self.right_line.x = right_fitx
+        self.right_line.y = ploty
 
         out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
         out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
@@ -247,6 +253,10 @@ class Lane():
         ploty = np.linspace(0, binary.shape[0]-1, binary.shape[0])
         left_fitx = left_fit[0]*ploty**2 + left_fit[1]*ploty + left_fit[2]
         right_fitx = right_fit[0]*ploty**2 + right_fit[1]*ploty + right_fit[2]
+        self.left_line.x = left_fitx
+        self.left_line.y = ploty
+        self.right_line.x = right_fitx
+        self.right_line.y = ploty
 
         # And you're done! But let's visualize the result here as well
         # Create an image to draw on and an image to show the selection window
@@ -293,8 +303,28 @@ class Lane():
     def center_offset(self, img):
         raise NotImplemented
 
-    def overlay(self, img):
-        raise NotImplemented
+    def overlay(self, img, camera):
+        # Create an image to draw the lines on
+        # warp_zero = np.zeros_like(warped).astype(np.uint8)
+        # color_warp = np.dstack((warp_zero, warp_zero, warp_zero))
+        color_warp = np.zeros_like(img).astype(np.uint8)
+
+        # Recast the x and y points into usable format for cv2.fillPoly()
+        left_x = self.left_line.x
+        left_y = self.left_line.y
+        right_x = self.right_line.x
+        right_y = self.right_line.y
+        pts_left = np.array([np.transpose(np.vstack([left_x, left_y]))])
+        pts_right = np.array([np.flipud(np.transpose(np.vstack([right_x, right_y])))])
+        pts = np.hstack((pts_left, pts_right))
+
+        # Draw the lane onto the warped blank image
+        cv2.fillPoly(color_warp, np.int_([pts]), (0, 255, 0))
+
+        # Warp the blank back to original image space using inverse perspective matrix (Minv)
+        newwarp = cv2.warpPerspective(color_warp, camera.M_front, (img.shape[1], img.shape[0]))
+        # Combine the result with the original image
+        return cv2.addWeighted(img, 1, newwarp, 0.3, 0)
 
 
 def gaussian_blur(img, kernel):
@@ -384,18 +414,15 @@ def pipeline(img, camera, lane):
     # Smoothing ... last 5 frames...
     # lane.sanity_check()
     # x = lane.center_offset(img)
-    # lane.overlay(img)
+    overlay = lane.overlay(undist, camera)
     plt.figure()
-    plt.subplot(121)
-    plt.imshow(undist)
-    plt.subplot(122)
-    plt.imshow(binary, cmap='gray')
+    plt.imshow(overlay)
     plt.show()
 
 
 def main():
     camera, lane = setup()
-    img = cv2.cvtColor(cv2.imread('test1.jpg'), cv2.COLOR_BGR2RGB)
+    img = cv2.cvtColor(cv2.imread('test6.jpg'), cv2.COLOR_BGR2RGB)
     pipeline(img, camera, lane)
 
 
@@ -429,19 +456,6 @@ def test_perspective(img, camera):
     plt.subplot(212)
     plt.imshow(plan)
     plt.show()
-
-
-# def test_lane_search(file):
-#     binary = cv2.imread(file)
-#     binary = binary[:, :, 0]
-#     binary = binary / 255
-#     binary = binary.astype(np.uint8)
-#     lane = Lane(width=1.0)
-#     plt.subplot(211)
-#     lane.search(binary)
-#     plt.subplot(212)
-#     lane.search(binary)
-#     plt.show()
 
 
 if __name__ == '__main__':
