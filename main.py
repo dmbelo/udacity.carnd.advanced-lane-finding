@@ -66,21 +66,21 @@ class Line():
         self.recent_x = [[], [], [], [], []]
         self.recent_y = [[], [], [], [], []]
         # average x values of the fitted line over the last n iterations
-        self.bestx = None
+        # self.bestx = None
         # polynomial coefficients averaged over the last n iterations
-        self.best_fit = None
+        # self.best_fit = None
         # polynomial coefficients for the most recent fit
         self.current_fit = [np.array([False])]
         # radius of curvature of the line in some units
-        self.radius_of_curvature = None
+        # self.radius_of_curvature = None
         # distance in meters of vehicle center from the line
-        self.line_base_pos = None
+        # self.line_base_pos = None
         # difference in fit coefficients between last and new fits
-        self.diffs = np.array([0, 0, 0], dtype=np.float)
+        # self.diffs = np.array([0, 0, 0], dtype=np.float)
         # x values for detected line pixels
-        self.allx = None
+        # self.allx = None
         # y values for detected line pixels
-        self.ally = None
+        # self.ally = None
 
     def update_xy(self, x, y):
         self.recent_x[:-1] = self.recent_x[1:]
@@ -93,7 +93,7 @@ class Line():
         # List of lists into one numpy array
         x = np.array([item for sublist in self.recent_x for item in sublist])
         y = np.array([item for sublist in self.recent_y for item in sublist])
-        print(x.shape[0])
+        # print(x.shape[0])
         if x.shape[0] > n:
             return np.polyfit(y, x, 2)
         else:
@@ -196,22 +196,20 @@ class Lane():
 
         out_img[nonzeroy[left_lane_inds], nonzerox[left_lane_inds]] = [255, 0, 0]
         out_img[nonzeroy[right_lane_inds], nonzerox[right_lane_inds]] = [0, 0, 255]
+        plt.figure()
         plt.imshow(out_img)
         plt.plot(left_fitx, ploty, color='yellow')
         plt.plot(right_fitx, ploty, color='yellow')
         plt.xlim(0, 1280)
         plt.ylim(720, 0)
-
-        # plt.show()
+        plt.show()
 
         # Record findings
         self.left_line.detected = True
         self.left_line.current_fit = left_fit
-        self.left_line.best_fit = left_fit
 
         self.right_line.detected = True
         self.right_line.current_fit = right_fit
-        self.right_line.best_fit = right_fit
 
     def targeted_search(self, binary):
         # Skip the sliding windows step once you know where the lines are
@@ -219,8 +217,8 @@ class Lane():
         # of video you don't need to do a blind search again, but instead you
         # can just search in a margin around the previous line position
         # like this:
-        left_fit = self.left_line.best_fit
-        right_fit = self.right_line.best_fit
+        left_fit = self.left_line.current_fit
+        right_fit = self.right_line.current_fit
         # Assume you now have a new warped binary image
         # from the next frame of video (also called "binary_warped")
         # It's now much easier to find line pixels!
@@ -271,13 +269,13 @@ class Lane():
         cv2.fillPoly(window_img, np.int_([left_line_pts]), (0, 255, 0))
         cv2.fillPoly(window_img, np.int_([right_line_pts]), (0, 255, 0))
         result = cv2.addWeighted(out_img, 1, window_img, 0.3, 0)
+        plt.figure()
         plt.imshow(result)
         plt.plot(left_fitx, ploty, color='yellow')
         plt.plot(right_fitx, ploty, color='yellow')
         plt.xlim(0, 1280)
         plt.ylim(720, 0)
-
-        # plt.show()
+        plt.show()
 
     def search(self, binary):
         if (self.left_line.detected | self.right_line.detected):
@@ -373,20 +371,21 @@ def setup(config_file='config.json'):
     camera.calibrate(cal_images, nx=nx, ny=ny, save=False)
     camera.perspective_setup(src, dst)
 
-    lane = Lane(Line(), Line(), lane_width)
+    lane = Lane(lane_width)
 
     return camera, lane
 
 
 def pipeline(img, camera, lane):
     undist = camera.undistort(img)
-    # plan = camera.plan_view(undist)
-    binary, abs_bin, hsl_bin = gradient_threshold(undist)
+    plan = camera.plan_view(undist)
+    binary, info = gradient_threshold(plan)
     lane.search(binary)
     # Smoothing ... last 5 frames...
     # lane.sanity_check()
     # x = lane.center_offset(img)
     # lane.overlay(img)
+    plt.figure()
     plt.subplot(121)
     plt.imshow(undist)
     plt.subplot(122)
@@ -397,7 +396,6 @@ def pipeline(img, camera, lane):
 def main():
     camera, lane = setup()
     img = cv2.cvtColor(cv2.imread('test1.jpg'), cv2.COLOR_BGR2RGB)
-
     pipeline(img, camera, lane)
 
 
@@ -433,17 +431,17 @@ def test_perspective(img, camera):
     plt.show()
 
 
-def test_lane_search(file):
-    binary = cv2.imread(file)
-    binary = binary[:, :, 0]
-    binary = binary / 255
-    binary = binary.astype(np.uint8)
-    lane = Lane(width=1.0)
-    plt.subplot(211)
-    lane.search(binary)
-    plt.subplot(212)
-    lane.search(binary)
-    plt.show()
+# def test_lane_search(file):
+#     binary = cv2.imread(file)
+#     binary = binary[:, :, 0]
+#     binary = binary / 255
+#     binary = binary.astype(np.uint8)
+#     lane = Lane(width=1.0)
+#     plt.subplot(211)
+#     lane.search(binary)
+#     plt.subplot(212)
+#     lane.search(binary)
+#     plt.show()
 
 
 if __name__ == '__main__':
